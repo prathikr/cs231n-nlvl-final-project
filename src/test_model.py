@@ -1,5 +1,5 @@
 from utils import CharadesDataset
-from models.nlvl_detr_v2 import NLVL_DETR
+from models.nlvl_detr import NLVL_DETR
 import torch
 from tqdm import tqdm 
 

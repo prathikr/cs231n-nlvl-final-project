@@ -1,6 +1,6 @@
 from utils.dataloader import CharadesDataset
 from utils.trainer import NLVLTrainer
-from models.nlvl_detr_v2 import NLVL_DETR
+from models.nlvl_detr import NLVL_DETR
 import torch
 from transformers import TrainingArguments
 from peft import get_peft_model, LoraConfig
@@ -103,7 +103,7 @@ def parse_args():
     parser = argparse.ArgumentParser()
     
     parser.add_argument("--data_dir", type=str, default="../data-small", help="Path to data directory")
-    parser.add_argument("--ort", action="store_true", help="Enable ONNX Runtime for accelerated training")
+    parser.add_argument("--ort", default=False, action="store_true", help="Enable ONNX Runtime for accelerated training")
     
     args = parser.parse_args()
     return args

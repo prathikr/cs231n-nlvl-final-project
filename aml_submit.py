@@ -41,17 +41,17 @@ def main(raw_args=None):
     env_vars = {"MODE": "cloud",
                 "TOKENIZERS_PARALLELISM": "true"}
     if args.ort:
-        env_vars["ORTMODULE_FALLBACK_POLICY"] = "FALLBACK_DISABLE",
+        env_vars["ORTMODULE_FALLBACK_POLICY"] = "FALLBACK_DISABLE"
     if args.verbose:
         env_vars["VERBOSE"] = "true"
 
     job = command(
         code=code_dir,
-        command="python train_model_v2.py --data_dir ${{inputs.charades}}" \
-              + " --ort" if args.ort else "",
+        command="python train_model.py --data_dir ${{inputs.charades}}" \
+            + (" --ort" if args.ort else ""),
         compute=args.compute,
         display_name=args.display_name \
-                   + "-ort" if args.ort else "",
+            + ("-ort" if args.ort else ""),
         # environment=Environment(build=BuildContext(path=environment_dir)),
         environment="cs231n-env@latest",
         environment_variables=env_vars,

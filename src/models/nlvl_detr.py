@@ -70,11 +70,11 @@ class NLVL_DETR(nn.Module):
 
     def _init_weights(self):
         for m in self.modules():
-            if isinstance(m, nn.Linear) or isinstance(m, nn.Conv2d):
+            if isinstance(m, nn.Linear):
                 nn.init.xavier_uniform_(m.weight)
                 if m.bias is not None:
                     nn.init.zeros_(m.bias)
-            elif isinstance(m, nn.LayerNorm) or isinstance(m, nn.BatchNorm2d):
+            elif isinstance(m, nn.LayerNorm):
                 nn.init.ones_(m.weight)
                 nn.init.zeros_(m.bias)
 
@@ -88,9 +88,7 @@ class NLVL_DETR(nn.Module):
             frame = torch.permute(frame, (0, 3, 1, 2)) # N, H, W, C -> N, C, H, W
             
             with torch.no_grad(): # FREEZE image embedding
-                inputs = self.image_processor(frame)
-                inputs["pixel_values"] = torch.as_tensor(inputs["pixel_values"][0]).unsqueeze(0) # numpy to tensor
-                inputs = inputs.to(self.vit.device)
+                inputs = self.image_processor(frame, return_tensors="pt").to(self.vit.device)
                 output = self.vit(**inputs)
             
             embedding[f] = self.embed_video_fc(output.pooler_output.squeeze(0))
