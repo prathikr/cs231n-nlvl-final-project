@@ -6,36 +6,48 @@ import time
 
 VERBOSE = os.getenv("VERBOSE", "false").lower() == "true"
 
-# class KMeansLayer(nn.Module):
-#     def __init__(self, n_clusters, max_iter=100):
-#         super(KMeansLayer, self).__init__()
-#         self.n_clusters = n_clusters
-#         self.max_iter = max_iter
+class KMeansLayer(nn.Module):
+    def __init__(self, n_clusters, max_iter=100):
+        super(KMeansLayer, self).__init__()
+        self.n_clusters = n_clusters
+        self.max_iter = max_iter
 
-#     def forward(self, x):
-#         if VERBOSE: print("Applying kmeans clustering...")
-#         num_frames, d_model = x.shape
-#         x = x.view(-1, d_model)  # Flatten the input to (num_samples, num_features)
+    def forward(self, x):
+        if VERBOSE: print("Applying kmeans clustering...", end=" "); start_time = time.time()
+        num_frames, d_model = x.shape
+        x = x.view(-1, d_model)  # Flatten the input to (num_samples, num_features)
 
-#         # Randomly initialize cluster centers
-#         initial_indices = torch.randperm(x.size(0))[:self.n_clusters]
-#         cluster_centers = x[initial_indices]
+        # Randomly initialize cluster centers
+        initial_indices = torch.randperm(x.size(0))[:self.n_clusters]
+        cluster_centers = x[initial_indices]
 
-#         for _ in range(self.max_iter):
-#             # Compute distances to cluster centers
-#             distances = torch.cdist(x, cluster_centers)
-#             # Assign samples to the nearest cluster center
-#             cluster_assignments = torch.argmin(distances, dim=1)
+        for _ in range(self.max_iter):
+            # Compute distances to cluster centers
+            distances = torch.cdist(x, cluster_centers)
 
-#             # Compute new cluster centers
-#             new_cluster_centers = torch.stack([x[cluster_assignments == k].mean(dim=0) for k in range(self.n_clusters)])
+            # Assign samples to the nearest cluster center
+            cluster_assignments = torch.argmin(distances, dim=1)
 
-#             # Check for convergence (if cluster centers do not change)
-#             if torch.all(cluster_centers == new_cluster_centers):
-#                 break
-#             cluster_centers = new_cluster_centers
+            # Compute new cluster centers
+            new_cluster_centers = torch.stack([x[cluster_assignments == k].mean(dim=0) for k in range(self.n_clusters)])
+            
+            # Handle case where <10 centroids are selected
+            # Step 1: Identify rows with NaN values
+            nan_rows = torch.isnan(new_cluster_centers).any(dim=1)
+            # Step 2: Calculate the average of non-NaN rows
+            non_nan_tensor = new_cluster_centers[~nan_rows]
+            average_row = non_nan_tensor.mean(dim=0, keepdim=True)
+            # Step 3: Replace NaN rows with the average row
+            new_cluster_centers[nan_rows] = average_row
 
-#         return cluster_centers
+            # Check for convergence (if cluster centers do not change)
+            threshold = 1e-6 
+            if torch.all(torch.abs(cluster_centers[~nan_rows] - new_cluster_centers[~nan_rows]) < threshold):
+                break
+            cluster_centers = new_cluster_centers
+
+        if VERBOSE: print(f"time: {round(time.time() - start_time, 4)} sec")
+        return cluster_centers
 
 class NLVL_DETR(nn.Module):
     def __init__(self, d_model=512, nhead=8, num_encoder_layers=5, num_decoder_layers=5, dim_feedforward=2048, dropout=0.1):
@@ -49,9 +61,9 @@ class NLVL_DETR(nn.Module):
         self.vit = ViTModel.from_pretrained("google/vit-base-patch16-224")
         self.embed_video_fc = nn.Linear(self.vit.config.hidden_size, self.d_model)
 
-        self.max_frames = 60
-        self.position_encoder_video = nn.Embedding(self.max_frames, d_model)
-        # self.kmeans_layer = KMeansLayer(n_clusters=20)
+        # self.max_frames = 60
+        # self.position_encoder_video = nn.Embedding(self.max_frames, d_model)
+        self.kmeans_layer = KMeansLayer(n_clusters=10)
         
         self.phi = AutoModel.from_pretrained("microsoft/phi-2") # tokenization handled by dataloader
         self.embed_query_fc = nn.Linear(self.phi.config.hidden_size, self.d_model)
@@ -114,16 +126,16 @@ class NLVL_DETR(nn.Module):
     def forward(self, video_frames, query_tokens, label_ids=None):
         # Extract Features
         video_features = self.embed_video(video_frames) # [60, 512]
-        # video_features = self.kmeans_layer(video_features) # [10, 512]
+        video_features = self.kmeans_layer(video_features) # [10, 512]
         text_features = self.embed_query(query_tokens) # [1, 512]
 
-        # Positional encoding
-        if VERBOSE: print("Positional encoding for video...", end=" "); start_time = time.time()
-        video_positions = self.position_encoder_video(
-            torch.arange(0, video_frames.shape[1], device=video_frames.device)
-        ) # [60, 512]
-        video_features = video_features + video_positions # [60, 512]
-        if VERBOSE: print(f"time: {round(time.time() - start_time, 4)} sec")
+        # # Positional encoding
+        # if VERBOSE: print("Positional encoding for video...", end=" "); start_time = time.time()
+        # video_positions = self.position_encoder_video(
+        #     torch.arange(0, video_frames.shape[1], device=video_frames.device)
+        # ) # [60, 512]
+        # video_features = video_features + video_positions # [60, 512]
+        # if VERBOSE: print(f"time: {round(time.time() - start_time, 4)} sec")
 
         # Transformer encoder
         if VERBOSE: print("Encoding video...", end=" "); start_time = time.time()
