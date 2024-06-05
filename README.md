@@ -15,3 +15,5 @@
 |            |    |       |
 +------------+    +-------+
 ```
+
+To view training/eval loss metrics, run `tensorboard --logdir results`
