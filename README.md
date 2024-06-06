@@ -17,3 +17,5 @@
 ```
 
 To view training/eval loss metrics, run `tensorboard --logdir results`
+
+Link to the [Charades-STA](https://prior.allenai.org/projects/charades) dataset. "Data (scaled to 480p, 13GB)" was used for this project.
